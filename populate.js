@@ -36,46 +36,43 @@ client.once('ready', async () => {
              process.exit(0);
         }
 
-        // Fetch members and filter out other bots
         const members = await guild.members.fetch();
         const humanMembers = members.filter(m => !m.user.bot);
         
-        // Convert the user list into an array of mention strings: "<@USER_ID>"
+        // Convert to standard mention format
         const mentions = humanMembers.map(m => `<@${m.id}>`);
         
-        console.log(`Starting silent bulk-add for ${mentions.length} members to thread: ${thread.name}`);
+        console.log(`Starting silent Ghost-Ping bulk-add for ${mentions.length} members to thread: ${thread.name}`);
 
-        // 3. The Bulk Chunking Loop
-        // We put 80 mentions in one message to stay safely under the 2000 character limit
-        const chunkSize = 80; 
+        // 3. The Ghost Ping Chunking Loop
+        // We use groups of 40 to stay safely under Discord's anti-spam mention limits
+        const chunkSize = 40; 
 
         for (let i = 0; i < mentions.length; i += chunkSize) {
             const chunk = mentions.slice(i, i + chunkSize);
-            const messageContent = chunk.join(' ');
+            
+            // Combine @silent with the mentions
+            const messageContent = `@silent ${chunk.join(' ')}`;
 
-            // Send the message SILENTLY
-            const sentMessage = await thread.send({
-                content: messageContent,
-                // THIS IS THE MAGIC SPELL: It completely disables the ping, red dot, and yellow highlight
-                allowedMentions: { parse: [] } 
-            });
+            // Send the message (this pulls them into the thread securely)
+            const sentMessage = await thread.send({ content: messageContent });
 
-            // Instantly delete our own message to keep the thread clean
+            // INSTANTLY delete the message to wipe the red dot and keep the chat clean
             await sentMessage.delete();
             
             addedCount += chunk.length;
             console.log(`...Chunk processed: Added ${addedCount}/${mentions.length} members.`);
             
-            // Pause for 1.5 seconds between sending messages to respect Discord's rate limits
+            // Pause for 1.5 seconds so Discord doesn't rate-limit our send/delete actions
             await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
-        console.log('\x1b[32m', `🎉 Complete Success: Silently added ${addedCount} members to the thread!`, '\x1b[0m');
+        console.log('\x1b[32m', `🎉 Complete Success: Ghost-pinged ${addedCount} members into the thread!`, '\x1b[0m');
         process.exit(0);
 
     } catch (error) {
         console.log('\x1b[31m', `🚨 BLOCK/ERROR CAUGHT: ${error.message}`, '\x1b[0m');
-        console.log('\x1b[33m', `⚠️ INTERRUPTED: But successfully added ${addedCount} members before failing.`, '\x1b[0m');
+        console.log('\x1b[33m', `⚠️ INTERRUPTED: But successfully processed ${addedCount} members before failing.`, '\x1b[0m');
         process.exit(0); 
     }
 });
