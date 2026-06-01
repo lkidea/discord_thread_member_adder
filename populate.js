@@ -3,10 +3,12 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const url = process.env.THREAD_URL;
 const token = process.env.BOT_TOKEN;
 
+
+
 // 1. URL Parsing
-// A Discord link looks like: https://discord.com/channels/GUILD_ID/CHANNEL_ID/THREAD_ID
-// We use a Regular Expression to extract the exact numbers we need from that link.
-const regex = /channels\/(\d+)\/(\d+)\/(\d+)/;
+// We use a Regular Expression to extract the exact numbers we need from the link.
+// This new regex accepts standard thread links (2 numbers) and message links (3 numbers).
+const regex = /channels\/(\d+)\/(\d+)/;
 const match = url.match(regex);
 
 if (!match) {
@@ -15,7 +17,10 @@ if (!match) {
 }
 
 const guildId = match[1];
-const threadId = match[3];
+const threadId = match[2]; // We only need the first two IDs to locate the thread
+
+
+
 
 // 2. Initialize Bot
 const client = new Client({
