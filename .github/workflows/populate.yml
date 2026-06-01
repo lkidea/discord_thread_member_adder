@@ -1,13 +1,9 @@
 name: Populate Discord Thread
 
-# This creates the manual trigger button in the GitHub UI
+# We completely removed the "inputs" section. 
+# The workflow now runs with just a single button click.
 on:
   workflow_dispatch:
-    inputs:
-      thread_url:
-        description: 'Paste the Discord Thread Link (e.g., https://discord.com/channels/...)'
-        required: true
-        type: string
 
 jobs:
   populate:
@@ -25,8 +21,8 @@ jobs:
         run: npm install discord.js
 
       - name: Run Auto-Adder Script
-        # We pass the token from your GitHub Secrets, and the link from your text box input
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          THREAD_URL: ${{ inputs.thread_url }}
+          # We tell GitHub to securely fetch the link from your new secret vault
+          THREAD_URL: ${{ secrets.THREAD_URL }} 
         run: node populate.js
