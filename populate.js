@@ -3,11 +3,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const url = process.env.THREAD_URL;
 const token = process.env.BOT_TOKEN;
 
-
-
 // 1. URL Parsing
-// We use a Regular Expression to extract the exact numbers we need from the link.
-// This new regex accepts standard thread links (2 numbers) and message links (3 numbers).
 const regex = /channels\/(\d+)\/(\d+)/;
 const match = url.match(regex);
 
@@ -17,22 +13,17 @@ if (!match) {
 }
 
 const guildId = match[1];
-const threadId = match[2]; // We only need the first two IDs to locate the thread
+const threadId = match[2];
 
-
-
-
-// 2. Initialize Bot
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers 
-        // Note: MessageContent intent is completely removed. Highly secure.
     ]
 });
 
 client.once('ready', async () => {
-    let addedCount = 0; // Our persistent counter
+    let addedCount = 0;
     
     try {
         console.log(`✅ Logged in as ${client.user.tag}`);
@@ -45,31 +36,46 @@ client.once('ready', async () => {
              process.exit(0);
         }
 
+        // Fetch members and filter out other bots
         const members = await guild.members.fetch();
-        console.log(`Starting to add ${members.size} members to thread: ${thread.name}`);
+        const humanMembers = members.filter(m => !m.user.bot);
+        
+        // Convert the user list into an array of mention strings: "<@USER_ID>"
+        const mentions = humanMembers.map(m => `<@${m.id}>`);
+        
+        console.log(`Starting silent bulk-add for ${mentions.length} members to thread: ${thread.name}`);
 
-        // 3. The Addition Loop
-        for (const [memberId, member] of members) {
-            if (member.user.bot) continue;
+        // 3. The Bulk Chunking Loop
+        // We put 80 mentions in one message to stay safely under the 2000 character limit
+        const chunkSize = 80; 
+
+        for (let i = 0; i < mentions.length; i += chunkSize) {
+            const chunk = mentions.slice(i, i + chunkSize);
+            const messageContent = chunk.join(' ');
+
+            // Send the message SILENTLY
+            const sentMessage = await thread.send({
+                content: messageContent,
+                // THIS IS THE MAGIC SPELL: It completely disables the ping, red dot, and yellow highlight
+                allowedMentions: { parse: [] } 
+            });
+
+            // Instantly delete our own message to keep the thread clean
+            await sentMessage.delete();
             
-            await thread.members.add(memberId);
-            addedCount++; // Increment counter for every successful addition
+            addedCount += chunk.length;
+            console.log(`...Chunk processed: Added ${addedCount}/${mentions.length} members.`);
             
-            // 300ms delay to respect Discord's rate limits
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Pause for 1.5 seconds between sending messages to respect Discord's rate limits
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
-        console.log('\x1b[32m', `🎉 Complete Success: Added ${addedCount} members to the thread!`, '\x1b[0m');
+        console.log('\x1b[32m', `🎉 Complete Success: Silently added ${addedCount} members to the thread!`, '\x1b[0m');
         process.exit(0);
 
     } catch (error) {
-        // 4. The graceful failure and ANSI color logs
-        // \x1b[31m sets the terminal text to RED. \x1b[0m resets it to default.
         console.log('\x1b[31m', `🚨 BLOCK/ERROR CAUGHT: ${error.message}`, '\x1b[0m');
         console.log('\x1b[33m', `⚠️ INTERRUPTED: But successfully added ${addedCount} members before failing.`, '\x1b[0m');
-        
-        // Exiting with '0' is the trick. It tells GitHub Actions the script ran perfectly, 
-        // so it will show a Green Checkmark for the job, masking the Discord block.
         process.exit(0); 
     }
 });
