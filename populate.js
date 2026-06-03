@@ -39,40 +39,30 @@ client.once('ready', async () => {
         const members = await guild.members.fetch();
         const humanMembers = members.filter(m => !m.user.bot);
         
-        // Convert to standard mention format
-        const mentions = humanMembers.map(m => `<@${m.id}>`);
-        
-        console.log(`Starting silent Ghost-Ping bulk-add for ${mentions.length} members to thread: ${thread.name}`);
+        console.log(`Starting individual API additions for ${humanMembers.size} members to thread: ${thread.name}`);
 
-        // 3. The Ghost Ping Chunking Loop
-        // We use groups of 40 to stay safely under Discord's anti-spam mention limits
-        const chunkSize = 40; 
-
-        for (let i = 0; i < mentions.length; i += chunkSize) {
-            const chunk = mentions.slice(i, i + chunkSize);
+        // 3. The Slow & Steady Loop (API Method)
+        for (const [memberId, member] of humanMembers) {
             
-            // Combine @silent with the mentions
-            const messageContent = `@silent ${chunk.join(' ')}`;
-
-            // Send the message (this pulls them into the thread securely)
-            const sentMessage = await thread.send({ content: messageContent });
-
-            // INSTANTLY delete the message to wipe the red dot and keep the chat clean
-            await sentMessage.delete();
+            // This forces Discord to update the roster (and generates the green arrow)
+            await thread.members.add(memberId);
+            addedCount++;
             
-            addedCount += chunk.length;
-            console.log(`...Chunk processed: Added ${addedCount}/${mentions.length} members.`);
+            // Pause for 300 milliseconds between each addition to avoid Cloudflare blocks
+            await new Promise(resolve => setTimeout(resolve, 300));
             
-            // Pause for 1.5 seconds so Discord doesn't rate-limit our send/delete actions
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Print progress every 50 members so you know it isn't frozen
+            if (addedCount % 50 === 0) {
+                console.log(`...Progress: Added ${addedCount} members.`);
+            }
         }
         
-        console.log('\x1b[32m', `🎉 Complete Success: Ghost-pinged ${addedCount} members into the thread!`, '\x1b[0m');
+        console.log('\x1b[32m', `🎉 Complete Success: Safely added ${addedCount} members to the thread!`, '\x1b[0m');
         process.exit(0);
 
     } catch (error) {
         console.log('\x1b[31m', `🚨 BLOCK/ERROR CAUGHT: ${error.message}`, '\x1b[0m');
-        console.log('\x1b[33m', `⚠️ INTERRUPTED: But successfully processed ${addedCount} members before failing.`, '\x1b[0m');
+        console.log('\x1b[33m', `⚠️ INTERRUPTED: But successfully added ${addedCount} members before failing.`, '\x1b[0m');
         process.exit(0); 
     }
 });
